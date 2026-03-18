@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>公司打卡系統</title>
-    <!-- 強制從 LINE 伺服器讀取 SDK -->
-    <script src="https://static.line-scdn.net"></script>
+    
+    <!-- 改用 cdnjs 作為備用來源，避開 LINE 伺服器連線問題 -->
+    <script src="https://cdnjs.cloudflare.com"></script>
+
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f7f6; }
         .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 80%; max-width: 320px; text-align: center; }
@@ -21,37 +23,21 @@
     <h2 id="userName">載入中...</h2>
     <button class="btn-in" onclick="handlePunch('checkIn')">上班打卡</button>
     <button class="btn-out" onclick="handlePunch('checkOut')">下班打卡</button>
-    <p id="status">準備就緒</p>
+    <p id="status">正在啟動系統...</p>
 </div>
 
 <script>
-    // --- 參數設定 ---
     const LIFF_ID = '2009512164-DC24Cr80'; 
     const GAS_URL = 'https://script.google.com'; 
 
-    // 啟動流程
+    // 確保 SDK 載入後再執行
     window.onload = function() {
-        checkSDK();
-    };
-
-    function checkSDK() {
         if (typeof liff === 'undefined') {
-            // 如果抓不到，500ms 後再試一次 (共嘗試 5 次)
-            let retryCount = 0;
-            const timer = setInterval(() => {
-                retryCount++;
-                if (typeof liff !== 'undefined') {
-                    clearInterval(timer);
-                    initLiff();
-                } else if (retryCount > 5) {
-                    clearInterval(timer);
-                    document.getElementById('status').innerText = "❌ SDK 載入超時，請更換網路環境 (例如切換 4G/5G)";
-                }
-            }, 500);
-        } else {
-            initLiff();
+            document.getElementById('status').innerText = "❌ SDK 依舊無法載入，請確認是否被 AdBlock 擋住";
+            return;
         }
-    }
+        initLiff();
+    };
 
     async function initLiff() {
         try {
