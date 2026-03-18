@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>公司考勤打卡</title>
-    <!-- 1. 確保 SDK 放在最前面 -->
+    <title>公司打卡系統</title>
+    <!-- 強制從 LINE 伺服器讀取 SDK -->
     <script src="https://static.line-scdn.net"></script>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f7f6; }
@@ -25,17 +25,33 @@
 </div>
 
 <script>
+    // --- 參數設定 ---
     const LIFF_ID = '2009512164-DC24Cr80'; 
     const GAS_URL = 'https://script.google.com'; 
 
-    // 2. 使用 window.onload 確保所有資源（包含 SDK）都下載完了才執行
+    // 啟動流程
     window.onload = function() {
-        if (typeof liff === 'undefined') {
-            document.getElementById('status').innerText = "SDK 載入失敗，請檢查網路";
-            return;
-        }
-        initLiff();
+        checkSDK();
     };
+
+    function checkSDK() {
+        if (typeof liff === 'undefined') {
+            // 如果抓不到，500ms 後再試一次 (共嘗試 5 次)
+            let retryCount = 0;
+            const timer = setInterval(() => {
+                retryCount++;
+                if (typeof liff !== 'undefined') {
+                    clearInterval(timer);
+                    initLiff();
+                } else if (retryCount > 5) {
+                    clearInterval(timer);
+                    document.getElementById('status').innerText = "❌ SDK 載入超時，請更換網路環境 (例如切換 4G/5G)";
+                }
+            }, 500);
+        } else {
+            initLiff();
+        }
+    }
 
     async function initLiff() {
         try {
@@ -45,30 +61,28 @@
             } else {
                 const profile = await liff.getProfile();
                 document.getElementById('userName').innerText = "你好, " + profile.displayName;
+                document.getElementById('status').innerText = "✅ 系統就緒";
             }
         } catch (err) {
-            document.getElementById('status').innerText = "初始化失敗: " + err.message;
+            document.getElementById('status').innerText = "⚠️ 初始化失敗: " + err.message;
             console.error(err);
         }
     }
 
     function handlePunch(type) {
-        const statusTag = document.getElementById('status');
-        statusTag.innerText = "定位中...";
-
+        document.getElementById('status').innerText = "定位中...";
         const timeoutId = setTimeout(() => { executePunch(type, 0, 0); }, 8000);
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                clearTimeout(timeoutId);
-                executePunch(type, position.coords.latitude, position.coords.longitude);
-            },
-            () => {
-                clearTimeout(timeoutId);
-                executePunch(type, 0, 0);
-            },
-            { enableHighAccuracy: false, timeout: 5000 }
-        );
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => { clearTimeout(timeoutId); executePunch(type, pos.coords.latitude, pos.coords.longitude); },
+                () => { clearTimeout(timeoutId); executePunch(type, 0, 0); },
+                { enableHighAccuracy: false, timeout: 5000 }
+            );
+        } else {
+            clearTimeout(timeoutId);
+            executePunch(type, 0, 0);
+        }
     }
 
     async function executePunch(type, lat, lng) {
