@@ -1,4 +1,4 @@
 window.APP_CONFIG = {
   LIFF_ID: "2009512164-DC24Cr80",
-  GAS_API_URL: "https://script.google.com/macros/s/AKfycby6Ml2UYSRKDYAQWs7u5hxy5FdnM6iTthLaRluvp63NLEhFVygm-GljvUVqBa0lp8XjlA/exec"
+  GAS_API_URL: "https://script.google.com/macros/s/AKfycbzKg7YauVru2V9ctiU0j98de_LH3UM9656S4zffQctWJbDvNR_zYi53b3El_6F0fqwxKQ/exec"
 };
