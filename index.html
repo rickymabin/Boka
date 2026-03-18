@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小公司打卡系統</title>
+    <title>公司考勤打卡</title>
+    <!-- 確保這行 SDK 在最前面 -->
     <script src="https://static.line-scdn.net"></script>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f7f6; }
@@ -11,76 +12,83 @@
         button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; }
         .btn-in { background-color: #00B900; }
         .btn-out { background-color: #E53935; }
+        #status { margin-top: 15px; font-size: 14px; color: #666; }
     </style>
 </head>
 <body>
+
 <div class="card">
-    <h2 id="userName">讀取中...</h2>
+    <h2 id="userName">載入中...</h2>
     <button class="btn-in" onclick="handlePunch('checkIn')">上班打卡</button>
     <button class="btn-out" onclick="handlePunch('checkOut')">下班打卡</button>
-    <p id="status">請確認開啟 GPS</p>
+    <p id="status">準備就緒</p>
 </div>
 
 <script>
-    const LIFF_ID = '2009512164-DC24Cr80'; // 您的 LIFF ID
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycby57iwcQxeh5FNeLhGRVoxubGIQA9NzQJhV4QN5McN-KtbHBYx4fC9rg_vhbmiTBxJXfg/exec'; // 務必填入最新的 GAS URL
+    // --- 請填入您的資訊 ---
+    const LIFF_ID = '2009512164-DC24Cr80'; 
+    const GAS_URL = '你的_GAS_網頁應用程式_URL'; 
 
+    // 初始化 LIFF
     async function initLiff() {
-        await liff.init({ liffId: LIFF_ID });
-        if (!liff.isLoggedIn()) { liff.login(); }
-        else {
-            const profile = await liff.getProfile();
-            document.getElementById('userName').innerText = "你好, " + profile.displayName;
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (!liff.isLoggedIn()) {
+                liff.login();
+            } else {
+                const profile = await liff.getProfile();
+                document.getElementById('userName').innerText = "你好, " + profile.displayName;
+            }
+        } catch (err) {
+            document.getElementById('status').innerText = "LIFF 初始化失敗";
+            console.error(err);
         }
     }
 
-async function handlePunch(type) {
-    const statusTag = document.getElementById('status');
-    statusTag.innerText = "定位中 (若超過5秒將自動打卡)...";
+    // 打卡動作
+    function handlePunch(type) {
+        const statusTag = document.getElementById('status');
+        statusTag.innerText = "定位中 (請等候約 5-10 秒)...";
 
-    // 設定一個安全計時器，防止導航器卡死
-    const timeoutId = setTimeout(() => {
-        console.warn("定位超時，自動進入打卡流程");
-        executePunch(type, 0, 0); // 座標填 0
-    }, 4000); // 4秒後強制執行
+        // 設定 10 秒強制跳轉（防卡死）
+        const timeoutId = setTimeout(() => {
+            console.warn("定位超時");
+            executePunch(type, 0, 0);
+        }, 10000);
 
-    try {
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                clearTimeout(timeoutId); // 成功取得定位，清除計時器
-                executePunch(type, position.coords.latitude, position.coords.longitude);
-            },
-            (error) => {
-                clearTimeout(timeoutId); // 定位出錯，清除計時器
-                console.error("定位失敗代碼: " + error.code);
-                // 即使失敗也允許打卡，座標設為 0
-                executePunch(type, 0, 0);
-            },
-            { 
-                enableHighAccuracy: false, // 改為 false 較快取得初步座標
-                timeout: 8000,             // 瀏覽器層級的逾時
-                maximumAge: 60000          // 允許使用 1 分鐘內的快取位置
-            }
-        );
-    } catch (err) {
-        clearTimeout(timeoutId);
-        executePunch(type, 0, 0);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    clearTimeout(timeoutId);
+                    executePunch(type, position.coords.latitude, position.coords.longitude);
+                },
+                (error) => {
+                    clearTimeout(timeoutId);
+                    console.error("定位失敗", error);
+                    executePunch(type, 0, 0); // 定位失敗依然執行打卡
+                },
+                { enableHighAccuracy: false, timeout: 8000 }
+            );
+        } else {
+            clearTimeout(timeoutId);
+            executePunch(type, 0, 0);
+        }
     }
-}
 
-// 獨立出的發送函式
-async function executePunch(type, lat, lng) {
-    try {
-        const profile = await liff.getProfile();
-        const finalUrl = `${GAS_URL}?type=${type}&lineId=${profile.userId}&userName=${encodeURIComponent(profile.displayName)}&lat=${lat}&lng=${lng}`;
-        
-        // 執行跳轉至 GAS
-        window.location.href = finalUrl;
-    } catch (e) {
-        alert("系統錯誤，請聯繫管理員：" + e.message);
+    // 執行發送至 GAS
+    async function executePunch(type, lat, lng) {
+        try {
+            const profile = await liff.getProfile();
+            const finalUrl = `${GAS_URL}?type=${type}&lineId=${profile.userId}&userName=${encodeURIComponent(profile.displayName)}&lat=${lat}&lng=${lng}`;
+            
+            // 跳轉到 GAS 完成記錄
+            window.location.href = finalUrl;
+        } catch (e) {
+            alert("系統錯誤：" + e.message);
+        }
     }
-}
 
+    // 啟動程式
     initLiff();
 </script>
 </body>
