@@ -36,13 +36,13 @@
 
 async function handlePunch(type) {
     const statusTag = document.getElementById('status');
-    statusTag.innerText = "定位中 (若超過10秒將自動打卡)...";
+    statusTag.innerText = "定位中 (若超過5秒將自動打卡)...";
 
     // 設定一個安全計時器，防止導航器卡死
     const timeoutId = setTimeout(() => {
         console.warn("定位超時，自動進入打卡流程");
         executePunch(type, 0, 0); // 座標填 0
-    }, 10000); // 10秒後強制執行
+    }, 4000); // 4秒後強制執行
 
     try {
         navigator.geolocation.getCurrentPosition(
