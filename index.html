@@ -147,29 +147,63 @@
 
     async function clockIn() {
       try {
-        setButtonsDisabled(true);
-        setStatus('正在送出上班打卡...');
-        const result = await api('clock_in');
-        setStatus(result.message || '上班打卡完成');
+        setStatus('取得定位中...');
+
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+
+          const result = await fetch(window.APP_CONFIG.GAS_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'clock_in',
+              accessToken: state.accessToken,
+              lat: latitude,
+              lng: longitude,
+              accuracy
+            })
+          });
+
+          const json = await result.json();
+          setStatus(json.message);
+
+        }, () => {
+          setStatus('無法取得定位', true);
+        });
+
       } catch (err) {
-        console.error(err);
-        setStatus('上班打卡失敗：' + (err.message || err), true);
-      } finally {
-        setButtonsDisabled(false);
+        setStatus(err.message, true);
       }
     }
 
     async function clockOut() {
       try {
-        setButtonsDisabled(true);
-        setStatus('正在送出下班打卡...');
-        const result = await api('clock_out');
-        setStatus(result.message || '下班打卡完成');
+        setStatus('取得定位中...');
+
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+
+          const result = await fetch(window.APP_CONFIG.GAS_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'clock_out',
+              accessToken: state.accessToken,
+              lat: latitude,
+              lng: longitude,
+              accuracy
+            })
+          });
+
+          const json = await result.json();
+          setStatus(json.message);
+
+        }, () => {
+          setStatus('無法取得定位', true);
+        });
+
       } catch (err) {
-        console.error(err);
-        setStatus('下班打卡失敗：' + (err.message || err), true);
-      } finally {
-        setButtonsDisabled(false);
+        setStatus(err.message, true);
       }
     }
 
