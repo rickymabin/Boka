@@ -32,19 +32,28 @@
     // 初始化 LIFF
     async function initLiff() {
         try {
-            await liff.init({ liffId: LIFF_ID });
+            // 加入延遲確保 SDK 完全載入
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+
+            await liff.init({ 
+                liffId: '2009512164-DC24Cr80', // 直接寫死 ID 測試，確保沒空格
+                withLoginOnExternalBrowser: true 
+            });
+
             if (!liff.isLoggedIn()) {
                 liff.login();
             } else {
                 const profile = await liff.getProfile();
                 document.getElementById('userName').innerText = "你好, " + profile.displayName;
+                document.getElementById('status').innerText = "系統就緒";
             }
         } catch (err) {
-            // 讓手機彈出具體錯誤原因，例如 "Invalid LIFF ID" 或 "Unauthorized"
-            alert("初始化失敗原因：" + err.message); 
-            document.getElementById('status').innerText = "LIFF 初始化失敗: " + err.code;
+            // 詳細報錯，如果是 ID 錯了會彈出 'Invalid LIFF ID'
+            alert("初始化錯誤: " + JSON.stringify(err));
+            document.getElementById('status').innerText = "失敗原因: " + err.message;
         }
     }
+
 
     // 打卡動作
     function handlePunch(type) {
