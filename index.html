@@ -34,22 +34,53 @@
         }
     }
 
-    function handlePunch(type) {
-        document.getElementById('status').innerText = "定位中...";
-        // 使用瀏覽器內建定位，不依賴 liff.getLocation
-        navigator.geolocation.getCurrentPosition(async (position) => {
-            const profile = await liff.getProfile();
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            
-            // 關鍵：直接跳轉到 GAS 網址來完成打卡 (避開連線失敗問題)
-            const finalUrl = `${GAS_URL}?type=${type}&lineId=${profile.userId}&userName=${encodeURIComponent(profile.displayName)}&lat=${lat}&lng=${lng}`;
-            window.location.href = finalUrl;
-            
-        }, (err) => {
-            alert("定位失敗，請確保手機已開啟 GPS 並允許瀏覽器讀取位置。");
-        }, { enableHighAccuracy: true });
+async function handlePunch(type) {
+    const statusTag = document.getElementById('status');
+    statusTag.innerText = "定位中 (若超過10秒將自動打卡)...";
+
+    // 設定一個安全計時器，防止導航器卡死
+    const timeoutId = setTimeout(() => {
+        console.warn("定位超時，自動進入打卡流程");
+        executePunch(type, 0, 0); // 座標填 0
+    }, 10000); // 10秒後強制執行
+
+    try {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                clearTimeout(timeoutId); // 成功取得定位，清除計時器
+                executePunch(type, position.coords.latitude, position.coords.longitude);
+            },
+            (error) => {
+                clearTimeout(timeoutId); // 定位出錯，清除計時器
+                console.error("定位失敗代碼: " + error.code);
+                // 即使失敗也允許打卡，座標設為 0
+                executePunch(type, 0, 0);
+            },
+            { 
+                enableHighAccuracy: false, // 改為 false 較快取得初步座標
+                timeout: 8000,             // 瀏覽器層級的逾時
+                maximumAge: 60000          // 允許使用 1 分鐘內的快取位置
+            }
+        );
+    } catch (err) {
+        clearTimeout(timeoutId);
+        executePunch(type, 0, 0);
     }
+}
+
+// 獨立出的發送函式
+async function executePunch(type, lat, lng) {
+    try {
+        const profile = await liff.getProfile();
+        const finalUrl = `${GAS_URL}?type=${type}&lineId=${profile.userId}&userName=${encodeURIComponent(profile.displayName)}&lat=${lat}&lng=${lng}`;
+        
+        // 執行跳轉至 GAS
+        window.location.href = finalUrl;
+    } catch (e) {
+        alert("系統錯誤，請聯繫管理員：" + e.message);
+    }
+}
+
     initLiff();
 </script>
 </body>
