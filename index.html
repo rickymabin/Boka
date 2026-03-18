@@ -32,27 +32,24 @@
     // 初始化 LIFF
     async function initLiff() {
         try {
-            // 加入延遲確保 SDK 完全載入
-            await new Promise(resolve => setTimeout(resolve, 500)); 
-
-            await liff.init({ 
-                liffId: '2009512164-DC24Cr80', // 直接寫死 ID 測試，確保沒空格
-                withLoginOnExternalBrowser: true 
-            });
+            // 確保 ID 前後沒有空格
+            await liff.init({ liffId: "2009512164-DC24Cr80" }); 
 
             if (!liff.isLoggedIn()) {
-                liff.login();
+                // 在電腦開啟時，這行會導向 LINE 登入頁面
+                liff.login(); 
             } else {
                 const profile = await liff.getProfile();
                 document.getElementById('userName').innerText = "你好, " + profile.displayName;
-                document.getElementById('status').innerText = "系統就緒";
+                document.getElementById('status').innerText = "準備就緒";
             }
         } catch (err) {
-            // 詳細報錯，如果是 ID 錯了會彈出 'Invalid LIFF ID'
+            // 如果還是出現 {}，請按下 F12 看看 Network 標籤頁裡的報錯內容
             alert("初始化錯誤: " + JSON.stringify(err));
-            document.getElementById('status').innerText = "失敗原因: " + err.message;
+            console.error("LIFF 錯誤詳情:", err);
         }
     }
+
 
 
     // 打卡動作
