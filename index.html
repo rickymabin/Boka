@@ -1,77 +1,179 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-Hant">
 <head>
-<meta charset="utf-8">
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LINE 打卡系統</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif; background:#fff8f2; color:#2f2a26; }
+    .wrap { min-height:100vh; display:grid; place-items:center; padding:20px; }
+    .card { width:100%; max-width:460px; background:#fff; border:1px solid #f0e3d7; border-radius:20px; box-shadow:0 8px 24px rgba(0,0,0,.08); padding:24px; }
+    .tag { display:inline-block; padding:6px 10px; border-radius:999px; background:#fff3ea; color:#df8b45; font-size:12px; font-weight:700; margin-bottom:12px; }
+    h1 { margin:0 0 8px; font-size:28px; }
+    .subtitle { color:#7c746d; margin-bottom:20px; line-height:1.6; }
+    .profile { display:flex; align-items:center; gap:14px; padding:14px; border:1px solid #f0e3d7; border-radius:16px; background:#fffdfb; margin-bottom:18px; }
+    .avatar { width:56px; height:56px; border-radius:50%; object-fit:cover; background:#f3efe9; }
+    .name { font-weight:700; font-size:18px; }
+    .user-id { color:#7c746d; font-size:12px; word-break:break-all; margin-top:4px; }
+    .status { white-space:pre-wrap; border:1px dashed #f0e3d7; background:#fffdf9; border-radius:16px; padding:14px; line-height:1.7; margin-bottom:18px; min-height:92px; }
+    .buttons { display:grid; gap:12px; }
+    button { border:0; border-radius:16px; padding:16px; font-size:18px; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .btn-in { background:#f4a261; color:#fff; }
+    .btn-out { background:#2a9d8f; color:#fff; }
+    .btn-refresh { background:#f3efe9; color:#2f2a26; }
+    .footer { margin-top:16px; font-size:12px; color:#7c746d; line-height:1.7; }
+    .error { color:#e76f51; }
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <div class="card">
+<!--      <div class="tag">LIFF + GAS API + Google Sheet</div>-->
+      <h1>LINE 打卡系統</h1>
+      <div class="subtitle">直接在 LINE 裡打開這個頁面，按按鈕就能上下班打卡。</div>
 
-<h2>LINE打卡</h2>
+      <div class="profile">
+        <img id="avatar" class="avatar" alt="avatar" />
+        <div>
+          <div id="name" class="name">載入中...</div>
+          <div id="userId" class="user-id"></div>
+        </div>
+      </div>
 
-<button onclick="clockIn()">上班</button>
-<button onclick="clockOut()">下班</button>
-<button onclick="status()">狀態</button>
+      <div id="status" class="status">系統初始化中，請稍候...</div>
 
-<p id="msg"></p>
+      <div class="buttons">
+        <button id="btnIn" class="btn-in" onclick="clockIn()">打卡上班</button>
+        <button id="btnOut" class="btn-out" onclick="clockOut()">打卡下班</button>
+        <button id="btnRefresh" class="btn-refresh" onclick="refreshStatus()">重新整理狀態</button>
+      </div>
 
-<script>
+<!--      <div class="footer">這版把 LIFF 前端與 GAS 後端分開，穩定很多。</div>-->
+    </div>
+  </div>
 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzyOP9EnrQZnDDNMpCFpvA7vrMCtGDc-CDwyrMYYwqXEjXj9m6FPtdZWW-Yt5TTHJOUeg/exec";
+  <script src="./config.js"></script>
+  <script>
+    let state = { accessToken: '', profile: null };
 
-let token = "";
+    function setStatus(text, isError = false) {
+      const el = document.getElementById('status');
+      el.textContent = text || '';
+      el.classList.toggle('error', !!isError);
+    }
 
-async function init(){
-  await liff.init({ liffId:"2009512164-DC24Cr80" });
+    function setButtonsDisabled(disabled) {
+      ['btnIn', 'btnOut', 'btnRefresh'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = disabled;
+      });
+    }
 
-  if(!liff.isLoggedIn()){
-    liff.login();
-    return;
-  }
+    async function api(action) {
+      const res = await fetch(window.APP_CONFIG.GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action,
+          accessToken: state.accessToken
+        })
+      });
 
-  token = liff.getAccessToken();
-}
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (e) {
+        throw new Error('GAS 回傳格式不是 JSON：' + text);
+      }
 
-function getLocation(){
-  return new Promise((res,rej)=>{
-    navigator.geolocation.getCurrentPosition(pos=>{
-      res(pos.coords);
-    },()=>rej());
-  });
-}
+      if (!json.ok) {
+        throw new Error(json.message || '操作失敗');
+      }
+      return json;
+    }
 
-async function callAPI(action, coords){
-  const r = await fetch(GAS_URL,{
-    method:"POST",
-    body:JSON.stringify({
-      action,
-      accessToken:token,
-      lat:coords.latitude,
-      lng:coords.longitude,
-      accuracy:coords.accuracy
-    })
-  });
-  return r.json();
-}
+    async function initApp() {
+      try {
+        if (!window.APP_CONFIG || !window.APP_CONFIG.LIFF_ID) {
+          throw new Error('請先設定 frontend/config.js 裡的 LIFF_ID');
+        }
+        if (!window.APP_CONFIG.GAS_API_URL) {
+          throw new Error('請先設定 frontend/config.js 裡的 GAS_API_URL');
+        }
 
-async function clockIn(){
-  const c = await getLocation();
-  const r = await callAPI("clock_in",c);
-  msg.innerText = r.message;
-}
+        await liff.init({
+          liffId: window.APP_CONFIG.LIFF_ID,
+          withLoginOnExternalBrowser: true
+        });
 
-async function clockOut(){
-  const c = await getLocation();
-  const r = await callAPI("clock_out",c);
-  msg.innerText = r.message;
-}
+        if (!liff.isLoggedIn()) {
+          liff.login({ redirectUri: location.href });
+          return;
+        }
 
-async function status(){
-  const r = await callAPI("status",{});
-  msg.innerText = r.message;
-}
+        state.accessToken = liff.getAccessToken();
+        if (!state.accessToken) {
+          throw new Error('缺少 access token');
+        }
 
-init();
+        state.profile = await liff.getProfile();
+        document.getElementById('avatar').src = state.profile.pictureUrl || '';
+        document.getElementById('name').textContent = state.profile.displayName || '未命名使用者';
+        document.getElementById('userId').textContent = state.profile.userId || '';
 
-</script>
+        await refreshStatus();
+      } catch (err) {
+        console.error(err);
+        setStatus('初始化失敗：' + (err.message || err), true);
+      }
+    }
+
+    async function refreshStatus() {
+      try {
+        setButtonsDisabled(true);
+        setStatus('正在讀取今日狀態...');
+        const result = await api('status');
+        setStatus(result.message || '狀態已更新');
+      } catch (err) {
+        console.error(err);
+        setStatus('讀取狀態失敗：' + (err.message || err), true);
+      } finally {
+        setButtonsDisabled(false);
+      }
+    }
+
+    async function clockIn() {
+      try {
+        setButtonsDisabled(true);
+        setStatus('正在送出上班打卡...');
+        const result = await api('clock_in');
+        setStatus(result.message || '上班打卡完成');
+      } catch (err) {
+        console.error(err);
+        setStatus('上班打卡失敗：' + (err.message || err), true);
+      } finally {
+        setButtonsDisabled(false);
+      }
+    }
+
+    async function clockOut() {
+      try {
+        setButtonsDisabled(true);
+        setStatus('正在送出下班打卡...');
+        const result = await api('clock_out');
+        setStatus(result.message || '下班打卡完成');
+      } catch (err) {
+        console.error(err);
+        setStatus('下班打卡失敗：' + (err.message || err), true);
+      } finally {
+        setButtonsDisabled(false);
+      }
+    }
+
+    window.addEventListener('load', initApp);
+  </script>
 </body>
 </html>
