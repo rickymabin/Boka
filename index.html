@@ -40,8 +40,9 @@
                 document.getElementById('userName').innerText = "你好, " + profile.displayName;
             }
         } catch (err) {
-            document.getElementById('status').innerText = "LIFF 初始化失敗";
-            console.error(err);
+            // 讓手機彈出具體錯誤原因，例如 "Invalid LIFF ID" 或 "Unauthorized"
+            alert("初始化失敗原因：" + err.message); 
+            document.getElementById('status').innerText = "LIFF 初始化失敗: " + err.code;
         }
     }
 
